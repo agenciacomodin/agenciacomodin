@@ -1,4 +1,4 @@
-name: Deploy FRIENDS Pages
+name: Build FRIENDS Direct HTML
 
 on:
   push:
@@ -7,46 +7,28 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Rebuild FRIENDS from static parts
+      - name: Rebuild direct FRIENDS HTML
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p _site
           cat friends/parts/p00.txt friends/parts/p01.txt friends/parts/p02.txt friends/parts/p03.txt friends/parts/p04.txt > /tmp/friends.b64
-          base64 -d /tmp/friends.b64 > _site/index.html
-          grep -q 'Conectá' _site/index.html
-          grep -q 'Explorar' _site/index.html
-          cp _site/index.html _site/404.html
-          touch _site/.nojekyll
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          base64 -d /tmp/friends.b64 > friends/direct.html
+          grep -q 'Conectá' friends/direct.html
+          grep -q 'Explorar' friends/direct.html
+          grep -q 'data-view="reservas"' friends/direct.html
+          grep -q 'data-view="saldo"' friends/direct.html
+          grep -q 'data-view="admin"' friends/direct.html
+          grep -q 'data:image/png;base64' friends/direct.html
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add friends/direct.html
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Publish direct FRIENDS HTML'
+          git push
