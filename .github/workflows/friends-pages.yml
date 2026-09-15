@@ -20,23 +20,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build direct FRIENDS HTML
+      - name: Rebuild FRIENDS from static parts
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p _site
-          curl -fL --retry 3 'https://friends-v1-production.vercel.app' -o /tmp/friends-shell.html
-          node <<'NODE'
-          const fs = require('fs');
-          const zlib = require('zlib');
-          const shell = fs.readFileSync('/tmp/friends-shell.html', 'utf8');
-          const m = shell.match(/const B='([^']+)'/);
-          if (!m) throw new Error('FRIENDS payload not found');
-          const html = zlib.gunzipSync(Buffer.from(m[1], 'base64')).toString('utf8');
-          if (!html.includes('Conectá. Compartí. Viví más.')) throw new Error('Unexpected FRIENDS HTML');
-          fs.writeFileSync('_site/index.html', html);
-          fs.writeFileSync('_site/404.html', html);
-          NODE
+          cat friends/parts/p00.txt friends/parts/p01.txt friends/parts/p02.txt friends/parts/p03.txt friends/parts/p04.txt > /tmp/friends.b64
+          base64 -d /tmp/friends.b64 > _site/index.html
+          grep -q 'Conectá' _site/index.html
+          grep -q 'Explorar' _site/index.html
+          cp _site/index.html _site/404.html
+          touch _site/.nojekyll
       - name: Configure Pages
         uses: actions/configure-pages@v5
         with:
