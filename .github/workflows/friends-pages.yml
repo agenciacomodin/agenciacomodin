@@ -1,0 +1,58 @@
+name: Deploy FRIENDS Pages
+
+on:
+  push:
+    paths:
+      - '.github/workflows/friends-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build direct FRIENDS HTML
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          curl -fL --retry 3 'https://friends-v1-production.vercel.app' -o /tmp/friends-shell.html
+          node <<'NODE'
+          const fs = require('fs');
+          const zlib = require('zlib');
+          const shell = fs.readFileSync('/tmp/friends-shell.html', 'utf8');
+          const m = shell.match(/const B='([^']+)'/);
+          if (!m) throw new Error('FRIENDS payload not found');
+          const html = zlib.gunzipSync(Buffer.from(m[1], 'base64')).toString('utf8');
+          if (!html.includes('Conectá. Compartí. Viví más.')) throw new Error('Unexpected FRIENDS HTML');
+          fs.writeFileSync('_site/index.html', html);
+          fs.writeFileSync('_site/404.html', html);
+          NODE
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
