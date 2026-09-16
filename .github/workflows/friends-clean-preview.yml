@@ -1,0 +1,56 @@
+name: Build FRIENDS Clean Preview
+
+on:
+  push:
+    paths:
+      - 'friends/PREVIEW_TRIGGER'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build clean public preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('friends/direct.html')
+          s=p.read_text(encoding='utf-8')
+          # Remove every existing script so public preview cannot be broken by backend/runtime code.
+          s=re.sub(r'<script\b[^>]*>[\s\S]*?</script>', '', s, flags=re.I)
+          # Remove stale PWA references.
+          s=re.sub(r'<link[^>]+rel="manifest"[^>]*>', '', s, flags=re.I)
+          s=re.sub(r'<link[^>]+rel="apple-touch-icon"[^>]*>', '', s, flags=re.I)
+          # Force stable public logo URL.
+          logo='https://raw.githubusercontent.com/agenciacomodin/agenciacomodin/main/friends/logo.png?v=20260916'
+          s=re.sub(r'(<img[^>]*class="brand"[^>]*src=")[^"]+("[^>]*>)', lambda m:m.group(1)+logo+m.group(2), s, count=1)
+          nav=r'''<script id="friends-clean-navigation">
+          (function(){
+            function sync(id){document.querySelectorAll('[data-view]').forEach(function(b){var on=b.getAttribute('data-view')===id;b.classList.toggle('on',on);if(b.closest('.nav'))b.classList.toggle('active',on);});}
+            function go(id){var to=document.getElementById(id);if(!to)return;var from=document.querySelector('.view.active');var wash=document.querySelector('.motion-wash');if(from===to){sync(id);return;}if(from)from.classList.add('leaving');if(wash)wash.classList.add('show');sync(id);setTimeout(function(){if(from)from.classList.remove('active','leaving');to.classList.add('active');to.style.animation='none';void to.offsetHeight;to.style.animation='';window.scrollTo(0,0);},150);setTimeout(function(){if(wash)wash.classList.remove('show');},340);}
+            document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-view]');if(!b)return;e.preventDefault();go(b.getAttribute('data-view'));});
+            var initial='inicio';document.querySelectorAll('.view').forEach(function(v){v.classList.toggle('active',v.id===initial);});sync(initial);window.__FRIENDS_CLEAN_PREVIEW__=true;
+          })();
+          </script>'''
+          s=s.replace('</body>',nav+'\n</body>',1)
+          Path('friends/preview.html').write_text(s,encoding='utf-8')
+          PY
+      - name: Commit preview
+        shell: bash
+        run: |
+          git config user.name "FRIENDS Preview Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add friends/preview.html
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Build clean FRIENDS preview"
+            git push
+          fi
