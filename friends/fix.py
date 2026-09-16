@@ -4,8 +4,9 @@ import re
 p = Path('friends/direct.html')
 s = p.read_text(encoding='utf-8')
 
-# Use a normal PNG file instead of the corrupted embedded logo data URI.
-s = re.sub(r'(<img[^>]*class="brand"[^>]*src=")[^"]+("[^>]*>)', lambda m: m.group(1)+'./logo.png?v=20260916'+m.group(2), s, count=1)
+# Use a normal public PNG file instead of the corrupted embedded logo data URI.
+logo_url = 'https://raw.githubusercontent.com/agenciacomodin/agenciacomodin/main/friends/logo.png?v=20260916'
+s = re.sub(r'(<img[^>]*class="brand"[^>]*src=")[^"]+("[^>]*>)', lambda m: m.group(1)+logo_url+m.group(2), s, count=1)
 
 # Remove stale PWA references for this public preview.
 s = re.sub(r'<link[^>]+rel="manifest"[^>]*>', '', s, flags=re.I)
